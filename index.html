@@ -3,493 +3,360 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>서울역 부모님 맞춤 맛집 가이드</title>
+    <title>서울역 부모님 맛집 추천 인포그래픽</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Visualization & Content Choices: 
+        - '꽃누리들밥' Key Features: Goal: Inform. Viz: Styled text cards with icons (Unicode). Justification: Clearly establish comparison baseline. Method: HTML/Tailwind.
+        - Price Distribution (Han-sik & Shabu): Goal: Compare. Viz: Bar Chart. Justification: Easy visual comparison of restaurant counts across price tiers. Library: Chart.js (Canvas).
+        - Key Amenity Distribution (e.g., '룸 유무', '주차 가능' for Han-sik & Shabu): Goal: Compare. Viz: Donut Charts. Justification: Quickly show prevalence of important features. Library: Chart.js (Canvas).
+        - Restaurant Highlights: Goal: Inform. Viz: Styled HTML cards. Justification: Concise summary for quick review. Method: HTML/Tailwind.
+        - Recommendation Guide: Goal: Organize/Guide. Viz: HTML/CSS flow diagram. Justification: Interactive-like selection assistance. Method: HTML/Tailwind.
+        - All charts use Chart.js ensuring Canvas rendering. CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. 
+    -->
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .tab-active { border-color: #0d9488; color: #0d9488; background-color: #ccfbf1; }
-        .filter-checkbox:checked + label { background-color: #0d9488; color: white; border-color: #0d9488; }
-        .modal { display: none; }
-        .modal-open { display: flex; }
-        @media (max-width: 640px) {
-            .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        @media (min-width: 641px) and (max-width: 1024px) {
-            .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        }
-        .price-tag {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        .price-1 { background-color: #a7f3d0; color: #047857; } /* ~2만원 */
-        .price-2 { background-color: #6ee7b7; color: #047857; } /* 2~5만원 */
-        .price-3 { background-color: #34d399; color: #065f46; } /* 5~10만원 */
-        .price-4 { background-color: #10b981; color: #064e3b; } /* 10만원 이상 */
+        body { font-family: 'Noto Sans KR', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin-left: auto; margin-right: auto; height: 300px; max-height: 350px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; max-height: 400px; } }
+        .section-title { font-size: 1.75rem; font-weight: 700; color: #0D9488; margin-bottom: 1rem; text-align: center; }
+        .sub-section-title { font-size: 1.25rem; font-weight: 600; color: #0F766E; margin-bottom: 0.75rem; margin-top:1.5rem; }
+        .card { background-color: white; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .highlight-stat { font-size: 2.5rem; font-weight: 700; color: #F97316; }
+        .palette-primary-bg { background-color: #0D9488; }
+        .palette-primary-text { color: #0D9488; }
+        .palette-accent-bg { background-color: #F97316; }
+        .palette-accent-text { color: #F97316; }
+        .kpi-card { background-color: #F0FDFA; border-left: 4px solid #0D9488; padding: 1rem; border-radius: 0.375rem; }
+        .kpi-card-title { font-weight: 600; color: #134E4A; margin-bottom: 0.25rem; }
+        .kpi-card-value { font-size: 1.5rem; font-weight: 700; color: #0D9488; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-700">
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl sm:text-4xl font-bold text-teal-700">서울역 부모님 맞춤 맛집 가이드</h1>
-            <p class="mt-2 text-slate-600">부모님과 함께할 특별한 식사, '꽃누리들밥'의 감동을 이어갈 맛집을 찾아보세요.</p>
-        </header>
-
-        <nav class="mb-6">
-            <div class="flex border-b border-slate-300">
-                <button id="tab-hansik" class="tab-button py-3 px-6 text-lg font-medium border-b-2 tab-active" data-type="한정식">한정식</button>
-                <button id="tab-shabu" class="tab-button py-3 px-6 text-lg font-medium border-b-2 border-transparent hover:border-teal-500 hover:text-teal-600" data-type="샤브샤브">샤브샤브</button>
-            </div>
-        </nav>
-
-        <section id="filters" class="mb-8 p-6 bg-white rounded-lg shadow">
-            <h2 class="text-xl font-semibold text-slate-800 mb-4">맛집 검색 필터</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                    <h3 class="text-sm font-medium text-slate-600 mb-2">가격대 (1인 기준)</h3>
-                    <div class="flex flex-wrap gap-2">
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="price" data-filter-value="all">전체</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="price" data-filter-value="1">~2만원</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="price" data-filter-value="2">2~5만원</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="price" data-filter-value="3">5~10만원</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="price" data-filter-value="4">10만원+</button>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-medium text-slate-600 mb-2">분위기</h3>
-                     <div class="flex flex-wrap gap-2">
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="atmosphere" data-filter-value="all">전체</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="atmosphere" data-filter-value="고급">고급/격식</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="atmosphere" data-filter-value="편안">편안/따뜻</button>
-                        <button class="filter-btn px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-teal-50" data-filter-group="atmosphere" data-filter-value="가성비">가성비</button>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-medium text-slate-600 mb-2">주요 특징</h3>
-                    <div class="flex flex-wrap gap-2 filter-grid">
-                        <div class="flex items-center">
-                            <input type="checkbox" id="feature-room" class="filter-checkbox hidden" data-filter-group="feature" data-filter-value="룸 있음">
-                            <label for="feature-room" class="px-3 py-1.5 border border-slate-300 rounded-md text-sm cursor-pointer hover:bg-teal-50 w-full text-center">🚪 룸 있음</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="feature-seafood" class="filter-checkbox hidden" data-filter-group="feature" data-filter-value="해산물">
-                            <label for="feature-seafood" class="px-3 py-1.5 border border-slate-300 rounded-md text-sm cursor-pointer hover:bg-teal-50 w-full text-center">🦀 해산물</label>
-                        </div>
-                         <div class="flex items-center">
-                            <input type="checkbox" id="feature-fish" class="filter-checkbox hidden" data-filter-group="feature" data-filter-value="생선구이">
-                            <label for="feature-fish" class="px-3 py-1.5 border border-slate-300 rounded-md text-sm cursor-pointer hover:bg-teal-50 w-full text-center">🐟 생선구이/솥밥</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="feature-solo" class="filter-checkbox hidden" data-filter-group="feature" data-filter-value="1인 식사">
-                            <label for="feature-solo" class="px-3 py-1.5 border border-slate-300 rounded-md text-sm cursor-pointer hover:bg-teal-50 w-full text-center">👤 1인 식사</label>
-                        </div>
-                         <div class="flex items-center">
-                            <input type="checkbox" id="feature-parking" class="filter-checkbox hidden" data-filter-group="feature" data-filter-value="주차 가능">
-                            <label for="feature-parking" class="px-3 py-1.5 border border-slate-300 rounded-md text-sm cursor-pointer hover:bg-teal-50 w-full text-center">🅿️ 주차 가능</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="feature-direct-station" class="filter-checkbox hidden" data-filter-group="feature" data-filter-value="서울역 직결">
-                            <label for="feature-direct-station" class="px-3 py-1.5 border border-slate-300 rounded-md text-sm cursor-pointer hover:bg-teal-50 w-full text-center">🚆 서울역 직결</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <section id="restaurant-introduction" class="mb-4 text-center">
-            <p class="text-slate-600"></p>
-        </section>
-
-        <section id="restaurant-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        </section>
-
-        <div id="no-results" class="hidden text-center py-10">
-            <p class="text-xl text-slate-500">선택하신 조건에 맞는 맛집이 없습니다. 필터를 조정해보세요.</p>
+    <header class="palette-primary-bg text-white py-8 text-center">
+        <div class="container mx-auto px-4">
+            <h1 class="text-3xl md:text-4xl font-bold">서울역 인근, 부모님과 함께할 맛집 찾기 🍽️</h1>
+            <p class="mt-2 text-lg text-teal-100">'꽃누리들밥'처럼 만족스러운 식사를 위한 추천 인포그래픽</p>
         </div>
+    </header>
 
-        <footer class="mt-12 pt-8 border-t border-slate-300 text-center">
-            <h2 class="text-xl font-semibold text-slate-800 mb-3">💡 부모님과의 식사, 성공적인 맛집 선택을 위한 팁!</h2>
-            <ul class="list-disc list-inside text-slate-600 space-y-1 max-w-2xl mx-auto text-left">
-                <li><strong>룸(개별 공간) 유무 확인:</strong> 조용하고 프라이빗한 대화를 원하시면 룸이 있는 식당을 우선 고려하세요.</li>
+    <main class="container mx-auto p-4 md:p-8">
+        <section id="intro" class="mb-12 text-center">
+            <p class="text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+                서울역 근처에서 부모님과 특별한 식사를 계획 중이신가요? '꽃누리들밥 경복궁점'의 정갈함, 푸짐함, 그리고 편안한 분위기를 기준으로, 부모님께서 만족하실 만한 한정식 및 샤브샤브 맛집 정보를 시각적으로 분석해 드립니다.
+            </p>
+        </section>
+
+        <section id="kkotnuri-profile" class="mb-12 card">
+            <h2 class="section-title">🔍 우리가 찾는 '꽃누리들밥' 스타일이란?</h2>
+            <p class="text-center text-slate-600 mb-6">사용자께서 만족하셨던 '꽃누리들밥 경복궁점'의 주요 특징은 다음과 같습니다. 이 기준들을 바탕으로 맛집을 분석합니다.</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="kpi-card">
+                    <div class="kpi-card-title">🌿 정갈함 & 푸짐함</div>
+                    <div class="kpi-card-value">반찬 맛 & 양</div>
+                    <p class="text-sm text-teal-700 mt-1">정갈한 맛과 푸짐한 구성</p>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-card-title">💰 가성비</div>
+                    <div class="kpi-card-value">합리적인 가격</div>
+                    <p class="text-sm text-teal-700 mt-1">가격 대비 높은 만족도</p>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-card-title">😌 편안한 분위기</div>
+                    <div class="kpi-card-value">가족 모임 적합</div>
+                    <p class="text-sm text-teal-700 mt-1">깔끔하고 넓은 공간</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="hansik-restaurants" class="mb-12">
+            <h2 class="section-title">🍚 한정식 맛집 분석</h2>
+            <p class="text-center text-slate-600 mb-8">보고서에서 추천된 6곳의 한정식 맛집을 분석했습니다.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="card">
+                    <h3 class="sub-section-title text-center">가격대 분포 (1인 메인/코스 기준)</h3>
+                    <div class="chart-container">
+                        <canvas id="hansikPriceChart"></canvas>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-2 text-center">다양한 가격대의 한정식 맛집이 분포되어 있어 예산에 맞춰 선택 가능합니다.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sub-section-title text-center">주요 특징 분포</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="chart-container !h-48 !max-h-52">
+                             <canvas id="hansikRoomChart"></canvas>
+                        </div>
+                        <div class="chart-container !h-48 !max-h-52">
+                            <canvas id="hansikParkingChart"></canvas>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-2 text-center">프라이빗 룸 보유 여부와 주차 가능 여부는 부모님 동반 시 중요한 고려 사항입니다.</p>
+                </div>
+            </div>
+            <div class="card mt-8">
+                <h3 class="sub-section-title">🌟 주목할 만한 한정식 맛집</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div>
+                        <h4 class="font-semibold text-lg palette-primary-text">서울로인 서울점</h4>
+                        <p class="text-sm text-slate-600 mt-1"><strong>특징:</strong> 고급스러운 개화기 인테리어, 프라이빗 룸, 콜키지 프리. 기념일/상견례에 적합.</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>가격대:</strong> 런치 5.9만~, 디너 9.9만~</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>'꽃누리들밥' 유사점:</strong> 깔끔함, 정갈함, 가족 모임 적합.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg palette-primary-text">정선할매곤드레밥 서울역</h4>
+                        <p class="text-sm text-slate-600 mt-1"><strong>특징:</strong> 시골 할머니 밥상 같은 편안함, 푸짐한 반찬, 가성비 좋음.</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>가격대:</strong> 점심특선 1.2만, 정식 1.5만~</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>'꽃누리들밥' 유사점:</strong> 푸짐한 반찬, 편안한 분위기, 가성비.</p>
+                    </div>
+                </div>
+                 <p class="text-xs text-slate-500 mt-4">위 정보는 보고서 내용을 요약한 것이며, 전체 목록 및 상세 정보는 보고서 원문을 참고하세요.</p>
+            </div>
+        </section>
+
+        <section id="shabu-restaurants" class="mb-12">
+            <h2 class="section-title">🍲 샤브샤브 맛집 분석</h2>
+            <p class="text-center text-slate-600 mb-8">보고서에서 추천된 5곳의 샤브샤브 맛집을 분석했습니다.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="card">
+                    <h3 class="sub-section-title text-center">가격대 분포 (1인 메인 기준)</h3>
+                    <div class="chart-container">
+                        <canvas id="shabuPriceChart"></canvas>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-2 text-center">샤브샤브 맛집들은 비교적 합리적인 가격대로 형성되어 있습니다.</p>
+                </div>
+                 <div class="card">
+                    <h3 class="sub-section-title text-center">주요 특징 분포</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="chart-container !h-48 !max-h-52">
+                             <canvas id="shabuSoloDiningChart"></canvas>
+                        </div>
+                        <div class="chart-container !h-48 !max-h-52">
+                            <canvas id="shabuValueChart"></canvas>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-2 text-center">1인 식사 가능 여부와 가성비는 샤브샤브 선택 시 유용한 정보입니다.</p>
+                </div>
+            </div>
+             <div class="card mt-8">
+                <h3 class="sub-section-title">🌟 주목할 만한 샤브샤브 맛집</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div>
+                        <h4 class="font-semibold text-lg palette-primary-text">후암편백</h4>
+                        <p class="text-sm text-slate-600 mt-1"><strong>특징:</strong> 정갈하고 깔끔한 분위기, 건강한 편백찜/샤브샤브, 가성비 좋음.</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>가격대:</strong> 1.2만 ~ 1.5만</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>'꽃누리들밥' 유사점:</strong> 가성비, 건강한 식사, 정갈함.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg palette-primary-text">송원스키야키 덕수궁</h4>
+                        <p class="text-sm text-slate-600 mt-1"><strong>특징:</strong> 1인 스키야키/샤브샤브, 3대째 전통 맛집, 깔끔하고 정갈함.</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>가격대:</strong> 2.3만 ~ 3.0만</p>
+                        <p class="text-sm text-slate-600 mt-1"><strong>'꽃누리들밥' 유사점:</strong> 깔끔함, 정갈한 한상, 푸짐한 야채.</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 mt-4">위 정보는 보고서 내용을 요약한 것이며, 전체 목록 및 상세 정보는 보고서 원문을 참고하세요.</p>
+            </div>
+        </section>
+
+        <section id="recommendation-guide" class="mb-12 card">
+            <h2 class="section-title">💡 어떤 맛집이 나에게 맞을까?</h2>
+            <p class="text-center text-slate-600 mb-6">부모님의 취향과 상황에 맞는 맛집 선택을 위한 간단 가이드입니다.</p>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="font-semibold text-lg palette-accent-text mb-2">1. 특별한 날, 격식 있는 식사를 원한다면?</h3>
+                    <p class="text-slate-700">➡️ <strong class="palette-primary-text">서울로인 서울점, 동화고옥 서울점</strong></p>
+                    <p class="text-sm text-slate-600 ml-4">고급스러운 분위기, 프라이빗 룸, 뛰어난 접근성 (서울스퀘어)</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg palette-accent-text mb-2">2. '꽃누리들밥'처럼 편안하고 가성비 좋은 한정식을 찾는다면?</h3>
+                    <p class="text-slate-700">➡️ <strong class="palette-primary-text">정선할매곤드레밥 서울역, 정백어가 그랜드센트럴서울역점</strong></p>
+                    <p class="text-sm text-slate-600 ml-4">푸근한 분위기, 푸짐한 구성, 합리적인 가격</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg palette-accent-text mb-2">3. 해산물 또는 특정 한식 메뉴를 선호하신다면?</h3>
+                    <p class="text-slate-700">➡️ <strong class="palette-primary-text">해담채 시청점</strong> (해산물 중심), <strong class="palette-primary-text">소애담 서울역</strong> (간장게장/소갈비 등)</p>
+                    <p class="text-sm text-slate-600 ml-4">부모님의 특정 음식 취향 저격 가능</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg palette-accent-text mb-2">4. 따뜻하고 건강한 샤브샤브를 합리적인 가격에 즐기고 싶다면?</h3>
+                    <p class="text-slate-700">➡️ <strong class="palette-primary-text">후암편백, 남산편백집, 꺼멍도새기 북창동</strong></p>
+                    <p class="text-sm text-slate-600 ml-4">가성비, 신선한 재료, 편안한 분위기</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg palette-accent-text mb-2">5. 1인 샤브샤브로 각자 깔끔하게 즐기고 싶다면?</h3>
+                    <p class="text-slate-700">➡️ <strong class="palette-primary-text">송원스키야키 덕수궁, 어바웃샤브 서대문역</strong></p>
+                    <p class="text-sm text-slate-600 ml-4">개별 세팅, 위생적, 다양한 선택지</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="final-tips" class="card">
+            <h2 class="section-title">📌 부모님 동반 시 추가 고려사항</h2>
+            <ul class="list-disc list-inside space-y-2 text-slate-700 max-w-2xl mx-auto">
+                <li><strong>룸(개별 공간) 여부:</strong> 조용하고 프라이빗한 대화를 원하시면 룸이 있는 식당을 우선 고려하세요. (예: 서울로인, 해담채, 동화고옥)</li>
                 <li><strong>접근성 및 주차:</strong> 대중교통 이용 시 서울역과의 거리, 차량 이용 시 주차 편의성을 확인하세요. (서울스퀘어 내 식당들은 접근성이 좋습니다.)</li>
                 <li><strong>서비스 만족도:</strong> 친절하고 세심한 서비스는 식사 경험을 더욱 풍요롭게 합니다. 방문 후기를 참고하세요.</li>
                 <li><strong>예약은 필수:</strong> 특히 주말이나 저녁 시간대에는 인기 식당의 경우 대기가 길 수 있으니, 방문 전 반드시 예약하시는 것이 좋습니다.</li>
                 <li><strong>부모님 취향 존중:</strong> 메뉴, 분위기 등 부모님께서 가장 선호하시는 스타일을 최우선으로 고려하여 선택하세요!</li>
             </ul>
-            <p class="mt-8 text-sm text-slate-500">&copy; 2024 서울역 맛집 가이드. 이 정보는 제공된 보고서를 기반으로 합니다.</p>
-        </footer>
-    </div>
+        </section>
+    </main>
 
-    <div id="restaurant-modal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8">
-            <div class="flex justify-between items-center mb-4">
-                <h2 id="modal-title" class="text-2xl font-bold text-teal-700"></h2>
-                <button id="modal-close-btn" class="text-slate-500 hover:text-slate-700 text-2xl">&times;</button>
-            </div>
-            <div id="modal-content" class="space-y-4 text-slate-700">
-            </div>
-        </div>
-    </div>
+    <footer class="text-center py-8 mt-8 border-t border-slate-200">
+        <p class="text-sm text-slate-500">본 인포그래픽은 제공된 '서울역 부모님 한식 맛집' 보고서 내용을 기반으로 제작되었습니다.</p>
+        <p class="text-sm text-slate-500">&copy; 2024 맛집 추천 인포그래픽</p>
+    </footer>
 
     <script>
-        const restaurants = [
-            {
-                id: "seouloin", name: "서울로인 서울점", type: "한정식",
-                priceText: "런치 5.9만~9.9만, 디너 9.9만~12.9만", priceCategory: "3",
-                atmosphere: ["고급"], features: ["룸 있음", "콜키지 프리", "기념일/상견례", "서울역 직결", "주차 가능"],
-                shortIntro: "고급스러운 개화기 인테리어와 정갈한 한정식 코스. 특별한 날 부모님과 함께하기 좋은 곳.",
-                accessibility: "서울역 9번 출구 연결 (도보 1분), 서울스퀘어 주차 (주말 2시간 무료)",
-                kkotnuriSimilarity: "깔끔함, 정갈한 한입 요리, 가족 모임 적합.",
-                description: `
-                    <p>서울역 바로 맞은편 서울스퀘어 지하 1층에 위치하여 접근성이 매우 우수합니다. "기념일이나 가족모임으로 좋다"는 평가를 받으며, 고급스러운 분위기와 프라이빗 룸을 갖추고 있어 특별한 날에 적합합니다. 개화기 시절의 한국스러운 인테리어가 특징이며, 콜키지 프리 서비스도 제공됩니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>디너 코스: A코스 (9.9만), B코스 (11.9만), 시그니처 코스 (12.9만)</li>
-                        <li>런치 코스: 5.9만 ~ 9.9만</li>
-                        <li>추천: '서울 차림 한입 요리' (9가지 구성), 육회 감태</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>깔끔하고 정갈한 음식 표현, 가족 모임에 적합한 분위기를 제공합니다. 다만, '꽃누리들밥'보다는 훨씬 고급스럽고 격식 있는 파인다이닝입니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">추가 정보:</h4>
-                    <p>캐치테이블/네이버 예약 가능. 부모님 생신, 상견례 장소로 추천됩니다.</p>
-                `
-            },
-            {
-                id: "haedamchae", name: "해담채 시청점", type: "한정식",
-                priceText: "점심 2만~4.5만, 저녁 3만~8만", priceCategory: "2",
-                atmosphere: ["편안"], features: ["룸 있음", "해산물", "주차 가능"],
-                shortIntro: "해산물 중심의 건강한 한정식. 모든 공간이 개별 룸으로 되어 있어 조용한 모임에 적합.",
-                accessibility: "서울역 3번 출구 도보 10분, 건물 주차 (오후 5시 이후 3시간 무료)",
-                kkotnuriSimilarity: "푸짐한 반찬, 개별 룸, 가족 모임 적합.",
-                description: `
-                    <p>남대문 인근에 위치하며, 모든 공간이 개별 룸으로 구성되어 조용하고 프라이빗한 식사가 가능합니다. 해산물을 중심으로 한 한정식 코스가 특징입니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>해담채 정식 (3.5만), 보리굴비 정식 (3.5만), 간장게장 정식 (4.0만)</li>
-                        <li>점심 정식: 2만원대 ~ 3만원대 후반</li>
-                        <li>저녁 스페셜 코스: 3만원대 ~ 6만원대</li>
-                        <li>특징: 기본 찬 19가지, 회와 해초류 쌈</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>푸짐한 기본 찬과 건강한 식사라는 가치를 공유합니다. '꽃누리들밥'의 푸짐함과 유사하며, 해산물을 선호하는 부모님께 좋은 선택입니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">추가 정보:</h4>
-                    <p>예약 가능. 단체 회식이나 가족 모임에 적합합니다.</p>
-                `
-            },
-            {
-                id: "soaedam", name: "소애담 서울역", type: "한정식",
-                priceText: "점심특선 1.2만~1.5만, 정식 2.5만~3.8만", priceCategory: "2",
-                atmosphere: ["편안", "가성비"], features: ["조용한 분위기"],
-                shortIntro: "다양한 한정식 메뉴와 가성비 좋은 점심 특선. 조용한 분위기에서 식사하기 좋은 곳.",
-                accessibility: "서울역 인근, 포장 가능, 예약은 전화 문의",
-                kkotnuriSimilarity: "조용한 분위기, 가성비 좋은 점심, 한정식 메뉴.",
-                description: `
-                    <p>서울역 인근에 위치한 한정식 집으로, 조용한 분위기에서 식사 모임에 적합합니다. 다양한 한정식 메뉴와 특히 가성비 좋은 점심 특선을 제공합니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>간장게장 한정식 (3.8만), 소갈비구이 한정식 (2.5만)</li>
-                        <li>점심특선 (11시~14시): 돌게장&보쌈 정식 (1.5만), 순두부&보쌈 정식 (1.2만)</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>'꽃누리들밥'이 제공하는 가성비와 푸짐한 정식의 가치와 유사한 경험을 제공합니다. 익숙하고 만족스러운 한식 메뉴 중심입니다.</p>
-                `
-            },
-            {
-                id: "donghwagook", name: "동화고옥 서울점", type: "한정식",
-                priceText: "런치 7.9만, 디너 9.9만~15.9만", priceCategory: "4",
-                atmosphere: ["고급"], features: ["룸 있음", "기념일/상견례", "서울역 직결", "주차 가능"],
-                shortIntro: "모던하고 고급스러운 한정식 파인다이닝. 특별한 기념일, 상견례 장소로 추천.",
-                accessibility: "서울역 9번 출구 연결 (도보 1분), 서울스퀘어 주차 (평일 1시간, 주말 2시간 무료)",
-                kkotnuriSimilarity: "깔끔함, 정갈한 플레이팅, 가족 모임 적합.",
-                description: `
-                    <p>서울스퀘어 지하 1층에 위치하여 접근성이 매우 뛰어납니다. 모던하고 고급스러운 분위기의 한정식 파인다이닝으로, 칠순잔치나 상견례 등 중요한 가족 행사에 적합합니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>코스 요리: 향연 코스(런치 7.9만), 금란 코스(9.9만), 영빈 코스(12.9만), 수라 코스(15.9만)</li>
-                        <li>단품: 언양식 한우 불고기 (3.9만), 도미솥밥 (3.7만)</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>깔끔하고 정갈한 상차림, 가족 모임에 적합한 점은 유사하나, '꽃누리들밥'의 편안함보다는 '품격'과 '고급스러움'에 중점을 둡니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">추가 정보:</h4>
-                    <p>캐치테이블/네이버 예약 가능. 아름다운 플레이팅과 프라이빗 룸이 장점입니다.</p>
-                `
-            },
-            {
-                id: "jeongbaekeoga", name: "정백어가 그랜드센트럴서울역점", type: "한정식",
-                priceText: "정찬 1.4만~2.1만", priceCategory: "1",
-                atmosphere: ["편안", "가성비"], features: ["생선구이", "솥밥", "서울역 직결", "주차 가능"],
-                shortIntro: "깔끔한 생선구이와 솥밥 정식. 합리적인 가격에 푸짐한 구성.",
-                accessibility: "서울역 그랜드센트럴 건물 1층 (4, 7번 출구), 주차 가능",
-                kkotnuriSimilarity: "깔끔함, 푸짐한 구성, 가성비, 정갈한 솥밥.",
-                description: `
-                    <p>서울역 그랜드센트럴 건물 1층에 위치한 생선구이 및 한정식 전문점입니다. 깔끔한 분위기와 합리적인 가격, 푸짐한 구성으로 좋은 평가를 받습니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>계절솥밥 고등어구이만찬 (1.7만), 통갈치구이만찬 (2.1만)</li>
-                        <li>임연수구이 정찬 (1.5만)</li>
-                        <li>2인 정찬 세트 (4.1만), 2인 찌개 세트 (3.8만)</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>깔끔한 분위기, 푸짐한 구성, 합리적인 가격, 정갈한 솥밥 제공 등 '꽃누리들밥'과 유사한 가치를 제공합니다. 생선 요리를 선호하는 부모님께 좋습니다.</p>
-                `
-            },
-            {
-                id: "jeongseonhalmae", name: "정선할매곤드레밥 서울역", type: "한정식",
-                priceText: "점심특선 1.2만, 정식 1.5만~2.1만", priceCategory: "1",
-                atmosphere: ["편안", "가성비"], features: ["푸짐한 반찬", "주차 가능"],
-                shortIntro: "시골 할머니 밥상 같은 푸근함. 가성비 좋은 곤드레밥 정식.",
-                accessibility: "서울역 인근, 주차 가능",
-                kkotnuriSimilarity: "푸짐한 반찬, 편안한 분위기, 정식 형태, 가성비.",
-                description: `
-                    <p>곤드레밥을 주력으로 하는 한정식집으로, "시골에서 할머니가 차려주신 밥상 같은 느낌"을 선사합니다. 푸짐한 반찬과 서민적이고 편안한 분위기가 특징입니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>곤드레정식 (2.1만), 만드레정식 (1.5만)</li>
-                        <li>점심특선 (1.2만) - 순두부, 곤드레밥, 된장찌개, 제육볶음 등</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>'푸짐한 반찬', '정식' 구성, '서민적이고 편안한' 분위기가 '꽃누리들밥'의 가성비 좋고 푸짐한 정식과 매우 유사합니다. 정겹고 편안한 식사 경험을 제공합니다.</p>
-                `
-            },
-            {
-                id: "huampyeonbaek", name: "후암편백", type: "샤브샤브",
-                priceText: "편백찜/샤브샤브 1.2만~1.5만", priceCategory: "1",
-                atmosphere: ["편안", "가성비"], features: ["편백찜", "건강식"],
-                shortIntro: "가성비 좋은 편백찜과 샤브샤브. 정갈하고 깔끔한 분위기.",
-                accessibility: "서울역 인근 후암동 (마을버스 추천), 예약 가능",
-                kkotnuriSimilarity: "가성비, 푸짐한 야채, 건강한 한 끼, 정갈한 분위기.",
-                description: `
-                    <p>서울역 근처 후암동에 위치하며, 편백찜과 샤브샤브를 주력으로 합니다. "가성비가 엄청 괜찮은 곳", "분위기 정갈하면서도 앉아서 이야기도 잘 나눌 수 있는 음식점"으로 평가받습니다. 깔끔한 분위기와 친절한 서비스가 장점입니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>소고기 편백찜 (1.2만), 이베리코 편백찜 (1.5만)</li>
-                        <li>소고기 샤브샤브 (1.2만), 이베리코 샤브샤브 (1.4만)</li>
-                        <li>밀푀유나베, 스키야키도 제공</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>건강한 조리 방식, 합리적인 가격, 깔끔하고 정갈한 분위기가 '꽃누리들밥'의 가치와 부합합니다. 부담 없이 방문하기 좋은 가족 외식 장소입니다.</p>
-                `
-            },
-            {
-                id: "namsanpyeonbaek", name: "남산편백집", type: "샤브샤브",
-                priceText: "샤브샤브/편백찜 1.49만, 점심특선 1.19만", priceCategory: "1",
-                atmosphere: ["편안", "가성비"], features: ["편백찜", "죽 맛집", "넓고 쾌적"],
-                shortIntro: "신선한 재료와 훌륭한 가성비. '죽 맛집'으로도 유명.",
-                accessibility: "회현역 인근 (도보 3분), 예약 가능",
-                kkotnuriSimilarity: "신선한 재료, 가성비, 푸짐함 (칼국수, 죽 포함).",
-                description: `
-                    <p>샤브샤브와 편백찜을 제공하며, "재료 신선하고 맛있어요", "가성비 매우 훌륭하다"는 평을 받습니다. 특히 죽 메뉴에 대한 호평이 많아 '죽맛집'으로 불립니다. 매장이 넓고 쾌적합니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>샤브샤브 (1인분/120g, 1.49만), 편백찜 (1인분/120g, 1.49만)</li>
-                        <li>점심특선 샤브샤브 (1인분/100g, 1.19만)</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>'꽃누리들밥'이 제공하는 푸짐하고 만족스러운 식사 경험과 유사합니다. 칼국수, 죽까지 이어지는 풍성한 코스가 장점입니다.</p>
-                `
-            },
-            {
-                id: "songwonsukiyaki", name: "송원스키야키 덕수궁", type: "샤브샤브",
-                priceText: "스키야키/샤브샤브 2.3만~3.0만", priceCategory: "2",
-                atmosphere: ["편안"], features: ["1인 식사", "전통 맛집"],
-                shortIntro: "1인 스키야키/샤브샤브 전문. 3대째 이어온 전통 맛집.",
-                accessibility: "시청역 7번 출구 도보 3분, 예약 가능, 주차 불가",
-                kkotnuriSimilarity: "깔끔함, 정갈한 한상차림, 푸짐한 야채.",
-                description: `
-                    <p>1966년부터 3대째 이어온 맛집으로, 1인 스키야키 또는 샤브샤브를 즐길 수 있습니다. 깔끔하고 정갈한 분위기이며, 조용한 곳을 좋아하는 사람에게 추천됩니다. 1인분씩 개별 냄비에 세팅되어 위생적입니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>원 스키야키/샤브샤브 (2.3만)</li>
-                        <li>송 스키야키/샤브샤브 (3.0만)</li>
-                        <li>국내산/호주산/해물 중 선택 가능</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>푸짐한 야채와 깔끔한 한상차림이 '꽃누리들밥'의 정갈하고 푸짐한 상차림과 유사한 만족감을 선사합니다. 위생적이고 개인화된 식사가 가능합니다.</p>
-                `
-            },
-            {
-                id: "aboutshabu", name: "어바웃샤브 서대문역", type: "샤브샤브",
-                priceText: "샤브세트 1.4만~1.9만", priceCategory: "1",
-                atmosphere: ["편안"], features: ["1인 식사", "친절한 서비스", "다양한 육수"],
-                shortIntro: "깔끔한 1인 샤브/스키야키. 친절한 서비스와 청결한 매장.",
-                accessibility: "서대문역 1번 출구 도보 1분, 주차장 없음",
-                kkotnuriSimilarity: "깔끔함, 친절한 서비스, 건강한 메뉴, 푸짐한 야채.",
-                description: `
-                    <p>서대문역 1번 출구 근처에 위치하며, "사장님 엄청 친절하시고", "매장은 청결하고 깔끔해서 좋다"는 평이 많습니다. 깔끔한 1인 샤브, 스키야키를 즐길 수 있으며, 육수는 가츠오와 매운맛 중 선택하거나 반반으로도 가능합니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>쇠고기 샤브세트 (1.4만), 해산물 샤브세트 (1.9만)</li>
-                        <li>점심 특선 가능</li>
-                        <li>버섯 샤브샤브, 해산물 1인, 소고기 1인 등 유연한 주문 가능</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>'꽃누리들밥'이 제공하는 깔끔하고 편안한 식사 경험과 유사합니다. 샤브샤브라는 따뜻하고 건강한 메뉴를 통해 만족스러운 한 끼를 제공합니다.</p>
-                `
-            },
-            {
-                id: "kkeomeongdosaegi", name: "꺼멍도새기 북창동", type: "샤브샤브",
-                priceText: "런치 1.2만, 일반 1.6만", priceCategory: "1",
-                atmosphere: ["편안", "가성비"], features: ["1인 식사", "흑돼지 샤브샤브"],
-                shortIntro: "흑돼지 샤브샤브 전문. 가성비 좋은 1인 샤브 가능.",
-                accessibility: "시청역 인근 북창동",
-                kkotnuriSimilarity: "가성비, 깔끔함, 건강한 메뉴.",
-                description: `
-                    <p>흑돼지 샤브샤브를 주력으로 하는 곳으로, "가성비가 좋다"는 평을 받습니다. 내부는 깔끔하고 정갈한 분위기이며, 1인용 샤브샤브를 판매하여 혼자서도 부담 없이 즐기기 좋습니다.</p>
-                    <h4 class="font-semibold mt-3 mb-1">주요 메뉴:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        <li>흑돼지 샤브샤브세트 (1.6만)</li>
-                        <li>런치스페셜 흑돼지 샤브샤브세트 (1.2만)</li>
-                    </ul>
-                    <h4 class="font-semibold mt-3 mb-1">꽃누리들밥과의 유사점:</h4>
-                    <p>'꽃누리들밥'의 푸짐하고 가성비 좋은 정식이라는 가치와 유사하게, 부담 없이 만족스러운 식사를 즐길 수 있는 장소입니다. 흑돼지라는 독특한 메뉴가 특징입니다.</p>
-                `
-            }
-        ];
-
-        const restaurantList = document.getElementById('restaurant-list');
-        const modal = document.getElementById('restaurant-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalContent = document.getElementById('modal-content');
-        const modalCloseBtn = document.getElementById('modal-close-btn');
-        const noResultsDiv = document.getElementById('no-results');
-        const restaurantIntroP = document.querySelector('#restaurant-introduction p');
-
-        let currentType = '한정식';
-        let currentFilters = {
-            price: 'all',
-            atmosphere: 'all',
-            feature: []
+        const reportData = {
+            hansik: [
+                { name: "서울로인 서울점", priceRange: "5.9만~12.9만", priceCat: "10만원 이상", room: true, parking: true },
+                { name: "해담채 시청점", priceRange: "2만~8만", priceCat: "2~5만원", room: true, parking: true }, // Adjusted for simplicity
+                { name: "소애담 서울역", priceRange: "1.2만~3.8만", priceCat: "2만원 이하", room: false, parking: false }, // Assuming no room/parking if not specified as major feature
+                { name: "동화고옥 서울점", priceRange: "7.9만~15.9만", priceCat: "10만원 이상", room: true, parking: true },
+                { name: "정백어가 그랜드센트럴서울역점", priceRange: "1.4만~2.1만", priceCat: "2만원 이하", room: false, parking: true },
+                { name: "정선할매곤드레밥 서울역", priceRange: "1.2만~2.1만", priceCat: "2만원 이하", room: false, parking: true }
+            ],
+            shabu: [
+                { name: "후암편백", priceRange: "1.2만~1.5만", priceCat: "2만원 이하", soloDining: true, value: true },
+                { name: "남산편백집", priceRange: "1.19만~1.49만", priceCat: "2만원 이하", soloDining: false, value: true },
+                { name: "송원스키야키 덕수궁", priceRange: "2.3만~3.0만", priceCat: "2~5만원", soloDining: true, value: false },
+                { name: "어바웃샤브 서대문역", priceRange: "1.4만~1.9만", priceCat: "2만원 이하", soloDining: true, value: true },
+                { name: "꺼멍도새기 북창동", priceRange: "1.2만~1.6만", priceCat: "2만원 이하", soloDining: true, value: true }
+            ]
         };
-        
-        const hansikIntro = "서울역 인근에서 부모님과 함께 방문하기 좋은 한정식 맛집들은 '꽃누리들밥'이 지닌 정갈함과 푸짐함, 그리고 편안한 분위기를 공유하면서도 각기 다른 매력을 선보입니다. 아래에서 다양한 한정식 맛집들을 살펴보세요.";
-        const shabuIntro = "한식과 유사하게 따뜻하고 건강한 식사를 선호하는 부모님을 위해 샤브샤브 맛집 또한 훌륭한 선택지가 될 수 있습니다. 신선한 재료와 깔끔한 국물, 그리고 푸짐한 야채는 '꽃누리들밥'이 추구하는 건강하고 만족스러운 식사 경험과 일맥상통합니다.";
 
-
-        function getPriceClass(priceCategory) {
-            if (priceCategory === "1") return "price-1";
-            if (priceCategory === "2") return "price-2";
-            if (priceCategory === "3") return "price-3";
-            if (priceCategory === "4") return "price-4";
-            return "bg-slate-200 text-slate-700";
-        }
-        
-        function renderRestaurants() {
-            restaurantList.innerHTML = '';
-            const filteredRestaurants = restaurants.filter(r => {
-                let typeMatch = r.type === currentType;
-                let priceMatch = currentFilters.price === 'all' || r.priceCategory === currentFilters.price;
-                let atmosphereMatch = currentFilters.atmosphere === 'all' || r.atmosphere.some(a => a.includes(currentFilters.atmosphere));
-                
-                let featureMatch = currentFilters.feature.length === 0 || currentFilters.feature.every(feat => r.features.includes(feat));
-
-                return typeMatch && priceMatch && atmosphereMatch && featureMatch;
-            });
-
-            if (filteredRestaurants.length === 0) {
-                noResultsDiv.classList.remove('hidden');
-            } else {
-                noResultsDiv.classList.add('hidden');
-            }
-            
-            restaurantIntroP.textContent = currentType === '한정식' ? hansikIntro : shabuIntro;
-
-            filteredRestaurants.forEach(r => {
-                const card = document.createElement('div');
-                card.className = 'bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col';
-                let featuresHTML = r.features.slice(0, 3).map(f => `<span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">${f}</span>`).join(' ');
-                if (r.features.length > 3) featuresHTML += ` <span class="text-xs text-slate-500">+${r.features.length - 3}</span>`;
-
-                card.innerHTML = `
-                    <div class="p-6 flex-grow">
-                        <h3 class="text-xl font-bold text-teal-700 mb-2">${r.name}</h3>
-                        <p class="text-sm text-slate-600 mb-3 h-16 overflow-hidden">${r.shortIntro}</p>
-                        <div class="mb-3">
-                             <span class="price-tag ${getPriceClass(r.priceCategory)}">${r.priceText}</span>
-                        </div>
-                        <div class="flex flex-wrap gap-2 mb-3">
-                            ${featuresHTML}
-                        </div>
-                        <p class="text-xs text-slate-500 mb-1"><span class="font-semibold">꽃누리들밥 유사점:</span> ${r.kkotnuriSimilarity}</p>
-                        <p class="text-xs text-slate-500"><span class="font-semibold">접근성:</span> ${r.accessibility}</p>
-                    </div>
-                    <div class="p-6 bg-slate-50">
-                        <button class="w-full bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 transition-colors view-details-btn" data-id="${r.id}">상세보기</button>
-                    </div>
-                `;
-                restaurantList.appendChild(card);
-            });
-
-            document.querySelectorAll('.view-details-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const restaurantId = e.target.dataset.id;
-                    const restaurant = restaurants.find(r => r.id === restaurantId);
-                    modalTitle.textContent = restaurant.name;
-                    modalContent.innerHTML = restaurant.description;
-                    modal.classList.add('modal-open');
-                });
-            });
-        }
-
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                currentType = e.target.dataset.type;
-                document.querySelectorAll('.tab-button').forEach(btn => {
-                    btn.classList.remove('tab-active');
-                    btn.classList.add('border-transparent', 'hover:border-teal-500', 'hover:text-teal-600');
-                });
-                e.target.classList.add('tab-active');
-                e.target.classList.remove('border-transparent', 'hover:border-teal-500', 'hover:text-teal-600');
-                renderRestaurants();
-            });
-        });
-        
-        document.querySelectorAll('.filter-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const group = e.target.dataset.filterGroup;
-                const value = e.target.dataset.filterValue;
-                currentFilters[group] = value;
-                
-                document.querySelectorAll(`.filter-btn[data-filter-group="${group}"]`).forEach(btn => {
-                    btn.classList.remove('bg-teal-600', 'text-white');
-                    btn.classList.add('border-slate-300', 'hover:bg-teal-50');
-                });
-                e.target.classList.add('bg-teal-600', 'text-white');
-                e.target.classList.remove('border-slate-300', 'hover:bg-teal-50');
-                renderRestaurants();
-            });
-        });
-        
-        document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                const group = e.target.dataset.filterGroup; // 'feature'
-                const value = e.target.dataset.filterValue;
-                if (e.target.checked) {
-                    if (!currentFilters[group].includes(value)) {
-                        currentFilters[group].push(value);
-                    }
-                } else {
-                    currentFilters[group] = currentFilters[group].filter(item => item !== value);
+        function processLabels(labels) {
+            return labels.map(label => {
+                if (label.length > 16) {
+                    const words = label.split(' ');
+                    const lines = [];
+                    let currentLine = '';
+                    words.forEach(word => {
+                        if ((currentLine + word).length > 16 && currentLine.length > 0) {
+                            lines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine += word + ' ';
+                        }
+                    });
+                    lines.push(currentLine.trim());
+                    return lines;
                 }
-                renderRestaurants();
+                return label;
             });
-        });
+        }
+        
+        const tooltipTitleCallback = function(tooltipItems) {
+            const item = tooltipItems[0];
+            let label = item.chart.data.labels[item.dataIndex];
+            if (Array.isArray(label)) {
+              return label.join(' ');
+            } else {
+              return label;
+            }
+        };
 
-        modalCloseBtn.addEventListener('click', () => {
-            modal.classList.remove('modal-open');
-        });
-
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('modal-open');
+        // Hansik Price Chart
+        const hansikPriceCategories = ["2만원 이하", "2~5만원", "5~10만원", "10만원 이상"];
+        const hansikPriceData = hansikPriceCategories.map(cat => reportData.hansik.filter(r => r.priceCat === cat).length);
+        new Chart(document.getElementById('hansikPriceChart'), {
+            type: 'bar',
+            data: {
+                labels: processLabels(hansikPriceCategories),
+                datasets: [{
+                    label: '한정식 식당 수',
+                    data: hansikPriceData,
+                    backgroundColor: ['#5EEAD4', '#34D399', '#10B981', '#0D9488'],
+                    borderColor: ['#0F766E', '#065F46', '#064E3B', '#052E16'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                scales: { y: { beginAtZero: true }, x: { ticks: { stepSize: 1 } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { title: tooltipTitleCallback } } }
             }
         });
+
+        // Hansik Room Chart
+        const hansikRoomCount = reportData.hansik.filter(r => r.room).length;
+        new Chart(document.getElementById('hansikRoomChart'), {
+            type: 'doughnut',
+            data: {
+                labels: processLabels(['룸 있음', '룸 없음']),
+                datasets: [{
+                    data: [hansikRoomCount, reportData.hansik.length - hansikRoomCount],
+                    backgroundColor: ['#0D9488', '#E5E7EB'],
+                    hoverOffset: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: '룸 보유 여부' }, tooltip: { callbacks: { title: tooltipTitleCallback } } } }
+        });
+
+        // Hansik Parking Chart
+        const hansikParkingCount = reportData.hansik.filter(r => r.parking).length;
+        new Chart(document.getElementById('hansikParkingChart'), {
+            type: 'doughnut',
+            data: {
+                labels: processLabels(['주차 가능', '주차 정보 확인 필요']),
+                datasets: [{
+                    data: [hansikParkingCount, reportData.hansik.length - hansikParkingCount],
+                    backgroundColor: ['#F97316', '#E5E7EB'],
+                    hoverOffset: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: '주차 가능 여부' }, tooltip: { callbacks: { title: tooltipTitleCallback } } } }
+        });
         
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelector(`.filter-btn[data-filter-group="price"][data-filter-value="all"]`).classList.add('bg-teal-600', 'text-white');
-            document.querySelector(`.filter-btn[data-filter-group="atmosphere"][data-filter-value="all"]`).classList.add('bg-teal-600', 'text-white');
-            renderRestaurants();
+        // Shabu Price Chart
+        const shabuPriceCategories = ["2만원 이하", "2~5만원"]; // Simplified based on data
+        const shabuPriceData = shabuPriceCategories.map(cat => reportData.shabu.filter(r => r.priceCat === cat).length);
+        new Chart(document.getElementById('shabuPriceChart'), {
+            type: 'bar',
+            data: {
+                labels: processLabels(shabuPriceCategories),
+                datasets: [{
+                    label: '샤브샤브 식당 수',
+                    data: shabuPriceData,
+                    backgroundColor: ['#FDBA74', '#FB923C'],
+                    borderColor: ['#D97706', '#B45309'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                scales: { y: { beginAtZero: true }, x: { ticks: { stepSize: 1 } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { title: tooltipTitleCallback } } }
+            }
+        });
+
+        // Shabu Solo Dining Chart
+        const shabuSoloDiningCount = reportData.shabu.filter(r => r.soloDining).length;
+        new Chart(document.getElementById('shabuSoloDiningChart'), {
+            type: 'doughnut',
+            data: {
+                labels: processLabels(['1인 식사 가능', '1인 식사 확인 필요']),
+                datasets: [{
+                    data: [shabuSoloDiningCount, reportData.shabu.length - shabuSoloDiningCount],
+                    backgroundColor: ['#0D9488', '#E5E7EB'],
+                    hoverOffset: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: '1인 식사 가능' }, tooltip: { callbacks: { title: tooltipTitleCallback } } } }
+        });
+        
+        // Shabu Value Chart
+        const shabuValueCount = reportData.shabu.filter(r => r.value).length;
+        new Chart(document.getElementById('shabuValueChart'), {
+            type: 'doughnut',
+            data: {
+                labels: processLabels(['가성비 좋음', '일반 가격대']),
+                datasets: [{
+                    data: [shabuValueCount, reportData.shabu.length - shabuValueCount],
+                    backgroundColor: ['#F97316', '#E5E7EB'],
+                    hoverOffset: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: '가성비' }, tooltip: { callbacks: { title: tooltipTitleCallback } } } }
         });
 
     </script>
